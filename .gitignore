@@ -1,0 +1,74 @@
+# Arquivo .gitignore para projetos Python com ComfyUI/Flask
+
+# Diretórios gerados
+/venv/
+/.venv/
+/env/
+/.env/
+/ENV/
+*.egg-info/
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.pytest_cache/
+/migrations/
+/images/  # Pasta de imagens geradas
+/build/
+/dist/
+/images/*
+
+# Arquivos de ambiente
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+.secrets
+
+# Arquivos de configuração local
+*.local
+*.local.*
+config_local.py
+
+# Arquivos de IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*.sublime-workspace
+*.sublime-project
+
+# Arquivos de sistema
+.DS_Store
+Thumbs.db
+
+# Arquivos de log
+*.log
+logs/
+
+# Arquivos temporários
+*.tmp
+*.temp
+
+# Arquivos de banco de dados SQLite
+*.sqlite3
+*.db
+
+# Arquivos de cache
+.cache/
+
+# Arquivos Jupyter Notebook
+*.ipynb
+
+# Arquivos de cobertura de testes
+.coverage
+htmlcov/
+
+# Arquivos de documentação
+docs/_build/
+
+# Arquivos específicos do projeto (adicione outros conforme necessário)
+workflow_local.json  # Qualquer variação local do workflow
+*.ckpt  # Modelos de IA
+*.safetensors  # Modelos de IA
+*.pt  # Modelos PyTorch
