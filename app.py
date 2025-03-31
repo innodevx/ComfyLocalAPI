@@ -163,6 +163,10 @@ def serve_image(filename):
     except FileNotFoundError:
         abort(404)
 
+@app.route('/', methods=['GET'])
+def running():
+    return "API is running!", 200
+
 
 if __name__ == '__main__':
     app.run(host=Config.HOST, port=Config.PORT, threaded=True)
