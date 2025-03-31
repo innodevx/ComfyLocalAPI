@@ -5,9 +5,11 @@ import uuid
 import websocket
 import requests
 from pathlib import Path
-from flask import Flask, jsonify, send_from_directory, abort, request
+from flask import Flask, jsonify, abort, request, Response
 from flask_cors import CORS
 from dotenv import load_dotenv
+import boto3
+from botocore.client import Config as BotoConfig
 
 load_dotenv()
 
@@ -18,7 +20,6 @@ CORS(app)
 class Config:
     COMFYUI_SERVER = os.getenv("COMFYUI_SERVER", "192.168.0.50:8188")
     CHARACTERS_API_URL = os.getenv("CHARACTERS_API_URL")
-    IMAGES_DIR = Path(os.getenv("IMAGES_DIR", "images"))
     WORKFLOW_FILE = Path(os.getenv("WORKFLOW_FILE", "workflow.json"))
     HOST = os.getenv("HOST", "0.0.0.0")
     PORT = int(os.getenv("PORT", 3000))
@@ -29,8 +30,29 @@ class Config:
         "seed": "3"
     }
 
+    MINIO_URL = os.getenv("MINIO_URL", "http://127.0.0.1:9000")
+    MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "admin")
+    MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "admin123")
+    MINIO_BUCKET = os.getenv("MINIO_BUCKET", "meu-bucket")
 
-Config.IMAGES_DIR.mkdir(exist_ok=True)
+s3_client = boto3.client(
+    's3',
+    endpoint_url=Config.MINIO_URL,
+    aws_access_key_id=Config.MINIO_ACCESS_KEY,
+    aws_secret_access_key=Config.MINIO_SECRET_KEY,
+    config=BotoConfig(signature_version='s3v4')
+)
+
+
+def init_minio_bucket():
+    try:
+        s3_client.head_bucket(Bucket=Config.MINIO_BUCKET)
+    except Exception as e:
+        app.logger.info(f"Bucket não encontrado, criando o bucket {Config.MINIO_BUCKET}: {e}")
+        s3_client.create_bucket(Bucket=Config.MINIO_BUCKET)
+
+
+init_minio_bucket()
 
 
 def load_workflow(prompt: str = None, width: int = None, height: int = None) -> dict:
@@ -140,9 +162,14 @@ def generate_image():
                 for image in node_output["images"]:
                     image_filename = f"{random.randint(1, 2 ** 64 - 1)}-{image['filename']}"
                     image_data = get_image(image['filename'], image['subfolder'], image['type'])
-                    filepath = Config.IMAGES_DIR / image_filename
-                    with open(filepath, "wb") as f:
-                        f.write(image_data)
+
+                    s3_client.put_object(
+                        Bucket=Config.MINIO_BUCKET,
+                        Key=image_filename,
+                        Body=image_data,
+                        ContentType='image/jpeg'
+                    )
+
                     generated_files.append(image_filename)
                     output_images.setdefault(node_id, []).append(image_filename)
 
@@ -159,14 +186,17 @@ def generate_image():
 @app.route('/images/<filename>', methods=['GET'])
 def serve_image(filename):
     try:
-        return send_from_directory(Config.IMAGES_DIR, filename)
-    except FileNotFoundError:
+        response = s3_client.get_object(Bucket=Config.MINIO_BUCKET, Key=filename)
+        image_data = response['Body'].read()
+        return Response(image_data, mimetype='image/jpeg')
+    except Exception as e:
+        app.logger.error(f"Erro ao servir a imagem {filename}: {str(e)}")
         abort(404)
+
 
 @app.route('/', methods=['GET'])
 def running():
     return "API is running!", 200
-
 
 if __name__ == '__main__':
     app.run(host=Config.HOST, port=Config.PORT, threaded=True)
